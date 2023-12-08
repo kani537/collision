@@ -1,5 +1,8 @@
 #include <Siv3D.hpp>
+#include <Siv3D/Profiler.hpp>
 #include <Siv3D/Scene.hpp>
+#include <Siv3D/System.hpp>
+#include <Siv3D/Unicode.hpp>
 
 #include "fraction/fraction.hpp"
 
@@ -46,11 +49,9 @@ bool isIntersects(const obj &a, const obj &b) {
   return (a._x < b._x + b._w && b._x < a._x) || (b._x < a._x + a._w && a._x < b._x);
 }
 
-int update(Array<obj> &objs) {
+std::set<std::pair<int, int>> getCollisions(const Array<obj> &objs) {
   std::set<std::pair<int, int>> collisions;
-  frac delta = frac(Scene::DeltaTime());
-  for (int i = 0; i < objs.size(); i++)
-    objs[i]._x += objs[i].velocity * delta;
+
   for (int i = 0; i < objs.size(); i++)
     for (int j = 0; j < objs.size(); j++) {
       if (i == j)
@@ -60,6 +61,10 @@ int update(Array<obj> &objs) {
         collisions.insert({std::min(i, j), std::max(i, j)});
     }
 
+  return collisions;
+}
+
+void calcCollisions(Array<obj> &objs, std::set<std::pair<int, int>> const collisions, frac delta) {
   for (auto &&[a, b] : collisions) {
     const frac va = objs[a].velocity, vb = objs[b].velocity;
 
@@ -89,6 +94,7 @@ int update(Array<obj> &objs) {
 
     objs[a]._x += -time * va + (delta - time) * objs[a].velocity;
     objs[b]._x += -time * vb + (delta - time) * objs[b].velocity;
+    delta -= time;
 
     Console << U"va:" << va.calc();
     Console << U"vb:" << vb.calc();
@@ -96,12 +102,38 @@ int update(Array<obj> &objs) {
     Console << U"vbd:" << objs[b].velocity.calc();
     Console << U"x:" << x.calc();
     Console << U"time:" << time.calc();
-    Console << U"left pos:" << (flag ? objs[b]._x + objs[b]._w : objs[a]._x + objs[a]._w).calc();
-    Console << U"right pos:" << (flag ? objs[a]._x : objs[b]._x).calc();
+    // Console << U"a pos:" << Unicode::Widen(objs[a]._x.get_top().str()) << '/' << Unicode::Widen(objs[a]._x.get_bottom().str());
+    Console << U"a pos:" << (objs[a]._x.get_top().str() + '/' + objs[a]._x.get_bottom().str()).size();
+    Console << U"a pos:" << objs[a]._x.calc();
     Console << ' ';
   }
+}
 
-  return collisions.size();
+int count = 0;
+int update(Array<obj> &objs) {
+  int collisionCount = 0;
+  std::set<std::pair<int, int>> collisions;
+  frac delta = frac(Scene::DeltaTime());
+  for (int i = 0; i < objs.size(); i++)
+    objs[i]._x += objs[i].velocity * delta;
+
+  collisions = getCollisions(objs);
+  collisionCount += collisions.size();
+  while (collisions.size() && System::Update()) {
+    calcCollisions(objs, collisions, delta);
+    collisions = getCollisions(objs);
+    count += collisions.size();
+    for (size_t i = 0; i < objs.size(); i++)
+      objs[i].rect().draw(HSV(i * 30));
+
+    ClearPrint();
+    Print << objs[1].rect();
+    Print << objs[1].velocity.calc();
+    Print << Profiler::FPS();
+    Print << count;
+  }
+
+  return collisionCount;
 }
 
 void Main() {
@@ -109,14 +141,12 @@ void Main() {
 
   Array<obj> objs;
   objs << obj(frac(100), frac(100), frac(3), frac(400), frac(1));
-  objs << obj(frac(402), frac(250), frac(100), frac(100), frac(100)).setVelocity(frac(-100)).setType(obj::obj_type::DYNAMIC);
+  objs << obj(frac(500), frac(250), frac(100), frac(100), frac(10000)).setVelocity(frac(-50)).setType(obj::obj_type::DYNAMIC);
   objs << obj(frac(300), frac(250), frac(100), frac(100), frac(1)).setVelocity(frac(0)).setType(obj::obj_type::DYNAMIC);
-
-  int count = 0;
 
   while (System::Update()) {
     // if (KeyEnter.down())
-    count += update(objs);
+    update(objs);
 
     for (size_t i = 0; i < objs.size(); i++)
       objs[i].rect().draw(HSV(i * 30));
@@ -124,6 +154,7 @@ void Main() {
     ClearPrint();
     Print << objs[1].rect();
     Print << objs[1].velocity.calc();
+    Print << Profiler::FPS();
     Print << count;
   }
 }
