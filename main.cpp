@@ -4,7 +4,6 @@ struct obj {
   enum class obj_type {
     STATIC,
     DYNAMIC,
-    KINEMATIC
   };
 
   obj(double x, double y, double w, double h, double mass) {
@@ -39,21 +38,13 @@ struct obj {
   obj_type _type = obj_type::STATIC;
 };
 
-bool isIntersects(const obj &a, const obj &b) {
-  return (a._x < b._x + b._w && b._x < a._x) || (b._x < a._x + a._w && a._x < b._x);
-}
-
 std::set<std::pair<int, int>> getCollisions(const Array<obj> &objs) {
   std::set<std::pair<int, int>> collisions;
 
-  for (int i = 0; i < objs.size(); i++)
-    for (int j = 0; j < objs.size(); j++) {
-      if (i == j)
-        continue;
-
-      if (isIntersects(objs[i], objs[j]))
-        collisions.insert({std::min(i, j), std::max(i, j)});
-    }
+  if (objs[2]._x <= objs[0]._x + objs[0]._w)
+    collisions.insert({0, 2});
+  if (objs[1]._x <= objs[2]._x + objs[2]._w)
+    collisions.insert({1, 2});
 
   return collisions;
 }
@@ -96,8 +87,6 @@ void calcCollisions(Array<obj> &objs, std::set<std::pair<int, int>> const collis
     Console << U"vbd:" << objs[b].velocity;
     Console << U"x:" << x;
     Console << U"time:" << time;
-    // Console << U"a pos:" << Unicode::Widen(objs[a]._x.get_top().str()) << '/' << Unicode::Widen(objs[a]._x.get_bottom().str());
-    // Console << U"a pos:" << (objs[a]._x.get_top().str() + '/' + objs[a]._x.get_bottom().str()).size();
     Console << U"a pos:" << objs[a]._x;
     Console << ' ';
   }
@@ -116,8 +105,9 @@ void update(Array<obj> &objs) {
     calcCollisions(objs, collisions, delta);
     collisions = getCollisions(objs);
     count += collisions.size();
+
     for (size_t i = 0; i < objs.size(); i++)
-      objs[i].rect().draw(HSV(i * 30));
+      objs[i].rect().draw(HSV(100 + i * 70, 0.5, 1));
 
     ClearPrint();
     Print << objs[1].rect();
@@ -131,15 +121,15 @@ void Main() {
   Window::Resize(1000, 600);
 
   Array<obj> objs;
-  objs << obj(double(100), double(100), double(3), double(400), double(1));
-  objs << obj(double(500), double(250), double(100), double(100), double(10000)).setVelocity(double(-50)).setType(obj::obj_type::DYNAMIC);
-  objs << obj(double(300), double(250), double(100), double(100), double(1)).setVelocity(double(0)).setType(obj::obj_type::DYNAMIC);
+  objs << obj(-1000, 100, 1100, 400, 1);
+  objs << obj(500, 100, 400, 400, 1000000).setVelocity(-100).setType(obj::obj_type::DYNAMIC);
+  objs << obj(300, 250, 100, 100, 1).setVelocity(0).setType(obj::obj_type::DYNAMIC);
 
   while (System::Update()) {
     update(objs);
 
     for (size_t i = 0; i < objs.size(); i++)
-      objs[i].rect().draw(HSV(i * 30));
+      objs[i].rect().draw(HSV(100 + i * 70, 0.5, 1));
 
     ClearPrint();
     Print << objs[1].rect();
