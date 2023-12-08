@@ -46,32 +46,62 @@ bool isIntersects(const obj &a, const obj &b) {
   return (a._x < b._x + b._w && b._x < a._x) || (b._x < a._x + a._w && a._x < b._x);
 }
 
-void update(Array<obj> &objs) {
+int update(Array<obj> &objs) {
   std::set<std::pair<int, int>> collisions;
-  for (int i = 0; i < objs.size(); i++) {
-    objs[i]._x += objs[i].velocity * frac(Scene::DeltaTime());
+  frac delta = frac(Scene::DeltaTime());
+  for (int i = 0; i < objs.size(); i++)
+    objs[i]._x += objs[i].velocity * delta;
+  for (int i = 0; i < objs.size(); i++)
     for (int j = 0; j < objs.size(); j++) {
       if (i == j)
         continue;
 
-      if (isIntersects(objs[i], objs[j])) {
+      if (isIntersects(objs[i], objs[j]))
         collisions.insert({std::min(i, j), std::max(i, j)});
-        if (objs[i].velocity < frac(0))
-          objs[i]._x += objs[j]._x + objs[j]._w - objs[i]._x;
-        else
-          objs[i]._x += objs[j]._x - objs[i]._x - objs[i]._w;
-
-        objs[i].velocity = -objs[i].velocity;
-      }
     }
+
+  for (auto &&[a, b] : collisions) {
+    const frac va = objs[a].velocity, vb = objs[b].velocity;
+
+    if (objs[a]._type == obj::obj_type::STATIC)
+      objs[b].velocity *= frac(-1);
+    else
+      objs[a].velocity = (va * (objs[a]._m - objs[b]._m) + frac(2) * objs[b]._m * vb) / (objs[a]._m + objs[b]._m);
+    if (objs[b]._type == obj::obj_type::STATIC)
+      objs[a].velocity *= frac(-1);
+    else
+      objs[b].velocity = va - vb + objs[a].velocity;
+
+    frac x;
+    frac time;
+    bool flag = false;
+    if (va.abs() < vb.abs())
+      flag = frac(0) < vb;
+    else
+      flag = va < frac(0);
+
+    if (flag)
+      x = objs[b]._x + (vb < frac(0) ? frac(0) : objs[b]._w) - objs[a]._x;
+    else
+      x = objs[a]._x + (va < frac(0) ? frac(0) : objs[a]._w) - objs[b]._x;
+
+    time = x / (va - vb).abs();
+
+    objs[a]._x += -time * va + (delta - time) * objs[a].velocity;
+    objs[b]._x += -time * vb + (delta - time) * objs[b].velocity;
+
+    Console << U"va:" << va.calc();
+    Console << U"vb:" << vb.calc();
+    Console << U"vad:" << objs[a].velocity.calc();
+    Console << U"vbd:" << objs[b].velocity.calc();
+    Console << U"x:" << x.calc();
+    Console << U"time:" << time.calc();
+    Console << U"left pos:" << (flag ? objs[b]._x + objs[b]._w : objs[a]._x + objs[a]._w).calc();
+    Console << U"right pos:" << (flag ? objs[a]._x : objs[b]._x).calc();
+    Console << ' ';
   }
 
-  // for (auto &&[a, b] : collisions) {
-  //   auto va = objs[a].velocity, vb = objs[b].velocity;
-  //   auto ta = 0;
-  //   objs[a].velocity = (va * (objs[a]._m - objs[b]._m) + frac(2) * objs[b]._m * vb) / (objs[a]._m + objs[b]._m);
-  //   objs[b].velocity = va - vb + objs[a].velocity;
-  // }
+  return collisions.size();
 }
 
 void Main() {
@@ -79,12 +109,14 @@ void Main() {
 
   Array<obj> objs;
   objs << obj(frac(100), frac(100), frac(3), frac(400), frac(1));
-  objs << obj(frac(450), frac(250), frac(100), frac(100), frac(1)).setVelocity(frac(-10)).setType(obj::obj_type::DYNAMIC);
-  objs << obj(frac(300), frac(250), frac(100), frac(100), frac(1)).setVelocity(frac(10)).setType(obj::obj_type::DYNAMIC);
+  objs << obj(frac(402), frac(250), frac(100), frac(100), frac(100)).setVelocity(frac(-100)).setType(obj::obj_type::DYNAMIC);
+  objs << obj(frac(300), frac(250), frac(100), frac(100), frac(1)).setVelocity(frac(0)).setType(obj::obj_type::DYNAMIC);
+
+  int count = 0;
 
   while (System::Update()) {
-    if (!KeyEnter.pressed())
-      update(objs);
+    // if (KeyEnter.down())
+    count += update(objs);
 
     for (size_t i = 0; i < objs.size(); i++)
       objs[i].rect().draw(HSV(i * 30));
@@ -92,5 +124,6 @@ void Main() {
     ClearPrint();
     Print << objs[1].rect();
     Print << objs[1].velocity.calc();
+    Print << count;
   }
 }
