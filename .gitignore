@@ -1,0 +1,7 @@
+/build
+/.vscode
+/.cache
+/resources
+collision
+.clang-format
+compile_commands.json

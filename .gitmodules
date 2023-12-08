@@ -1,0 +1,3 @@
+[submodule "fraction"]
+	path = fraction
+	url = git@github.com:kani537/fraction.git
